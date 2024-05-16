@@ -44,7 +44,7 @@ pub struct CreDtTm {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Stmt {
     #[serde(rename = "Id")]
-    pub id: Id,
+    pub id: String,
     #[serde(rename = "ElctrncSeqNb", skip_serializing_if = "Option::is_none")]
     pub elctrnc_seq_nb: Option<u32>,
     #[serde(rename = "LglSeqNb", skip_serializing_if = "Option::is_none")]

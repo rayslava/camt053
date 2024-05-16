@@ -49,7 +49,7 @@ struct TestCreDtTm {
 #[derive(Debug, Deserialize, PartialEq)]
 struct TestStmt {
     #[serde(rename = "Id")]
-    id: TestId,
+    id: String,
     #[serde(rename = "ElctrncSeqNb", skip_serializing_if = "Option::is_none")]
     elctrnc_seq_nb: Option<u32>,
     #[serde(rename = "LglSeqNb", skip_serializing_if = "Option::is_none")]
@@ -120,10 +120,7 @@ fn test_generate_camt053() {
                 cre_dt_tm: CreDtTm { value: "2024-05-16T16:05:00".to_string() },
             },
             stmt: vec![Stmt {
-                id: Id {
-                    iban: Some(IBAN { value: "DE89370400440532013000".to_string() }),
-                    othr: None,
-                },
+                id: "01".to_string(),
                 elctrnc_seq_nb: None,
                 lgl_seq_nb: None,
                 cre_dt_tm: CreDtTm { value: "2024-05-16T16:05:00".to_string() },
@@ -170,10 +167,7 @@ fn test_generate_camt053() {
                 cre_dt_tm: TestCreDtTm { value: "2024-05-16T16:05:00".to_string() },
             },
             stmt: vec![TestStmt {
-                id: TestId {
-                    iban: Some(TestIBAN { value: "DE89370400440532013000".to_string() }),
-                    othr: None,
-                },
+                id: "01".to_string(),
                 elctrnc_seq_nb: None,
                 lgl_seq_nb: None,
                 cre_dt_tm: TestCreDtTm { value: "2024-05-16T16:05:00".to_string() },
