@@ -59,6 +59,14 @@ pub struct Stmt {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Id {
+    #[serde(rename = "IBAN", skip_serializing_if = "Option::is_none")]
+    pub iban: Option<IBAN>,
+    #[serde(rename = "Othr", skip_serializing_if = "Option::is_none")]
+    pub othr: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IBAN {
     #[serde(rename = "$value")]
     pub value: String,
 }
@@ -72,7 +80,7 @@ pub struct Acct {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AcctId {
     #[serde(rename = "IBAN")]
-    pub iban: String,
+    pub iban: IBAN,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,10 +1,10 @@
 use camt053::models::*;
 use camt053::serialize::generate_camt053;
-use pretty_assertions::assert_eq;
 use quick_xml::de::from_str;
-use serde::Deserialize;
+use pretty_assertions::assert_eq;
 use std::fs::File;
 use std::io::Write;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize, PartialEq)]
 struct TestDocument {
@@ -64,6 +64,14 @@ struct TestStmt {
 
 #[derive(Debug, Deserialize, PartialEq)]
 struct TestId {
+    #[serde(rename = "IBAN", skip_serializing_if = "Option::is_none")]
+    iban: Option<TestIBAN>,
+    #[serde(rename = "Othr", skip_serializing_if = "Option::is_none")]
+    othr: Option<String>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestIBAN {
     #[serde(rename = "$value")]
     value: String,
 }
@@ -77,7 +85,7 @@ struct TestAcct {
 #[derive(Debug, Deserialize, PartialEq)]
 struct TestAcctId {
     #[serde(rename = "IBAN")]
-    iban: String,
+    iban: TestIBAN,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -108,25 +116,20 @@ fn test_generate_camt053() {
         xmlns: "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02".to_string(),
         bk_to_cstmr_stmt: BkToCstmrStmt {
             grp_hdr: GrpHdr {
-                msg_id: MsgId {
-                    value: "msg123".to_string(),
-                },
-                cre_dt_tm: CreDtTm {
-                    value: "2024-05-16T16:05:00".to_string(),
-                },
+                msg_id: MsgId { value: "msg123".to_string() },
+                cre_dt_tm: CreDtTm { value: "2024-05-16T16:05:00".to_string() },
             },
             stmt: vec![Stmt {
                 id: Id {
-                    value: "stmt123".to_string(),
+                    iban: Some(IBAN { value: "DE89370400440532013000".to_string() }),
+                    othr: None,
                 },
                 elctrnc_seq_nb: None,
                 lgl_seq_nb: None,
-                cre_dt_tm: CreDtTm {
-                    value: "2024-05-16T16:05:00".to_string(),
-                },
+                cre_dt_tm: CreDtTm { value: "2024-05-16T16:05:00".to_string() },
                 acct: Acct {
                     id: AcctId {
-                        iban: "DE89370400440532013000".to_string(),
+                        iban: IBAN { value: "DE89370400440532013000".to_string() },
                     },
                 },
                 ntry: vec![
@@ -134,7 +137,10 @@ fn test_generate_camt053() {
                         amt: 1000.0,
                         cdt_dbt_ind: "CRDT".to_string(),
                         ntry_dtls: NtryDtls {
-                            tx_dtls: vec![TxDtls { amt: 600.0 }, TxDtls { amt: 400.0 }],
+                            tx_dtls: vec![
+                                TxDtls { amt: 600.0 },
+                                TxDtls { amt: 400.0 },
+                            ],
                         },
                     },
                     Ntry {
@@ -160,25 +166,20 @@ fn test_generate_camt053() {
         xmlns: "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02".to_string(),
         bk_to_cstmr_stmt: TestBkToCstmrStmt {
             grp_hdr: TestGrpHdr {
-                msg_id: TestMsgId {
-                    value: "msg123".to_string(),
-                },
-                cre_dt_tm: TestCreDtTm {
-                    value: "2024-05-16T16:05:00".to_string(),
-                },
+                msg_id: TestMsgId { value: "msg123".to_string() },
+                cre_dt_tm: TestCreDtTm { value: "2024-05-16T16:05:00".to_string() },
             },
             stmt: vec![TestStmt {
                 id: TestId {
-                    value: "stmt123".to_string(),
+                    iban: Some(TestIBAN { value: "DE89370400440532013000".to_string() }),
+                    othr: None,
                 },
                 elctrnc_seq_nb: None,
                 lgl_seq_nb: None,
-                cre_dt_tm: TestCreDtTm {
-                    value: "2024-05-16T16:05:00".to_string(),
-                },
+                cre_dt_tm: TestCreDtTm { value: "2024-05-16T16:05:00".to_string() },
                 acct: TestAcct {
                     id: TestAcctId {
-                        iban: "DE89370400440532013000".to_string(),
+                        iban: TestIBAN { value: "DE89370400440532013000".to_string() },
                     },
                 },
                 ntry: vec![
@@ -186,7 +187,10 @@ fn test_generate_camt053() {
                         amt: 1000.0,
                         cdt_dbt_ind: "CRDT".to_string(),
                         ntry_dtls: TestNtryDtls {
-                            tx_dtls: vec![TestTxDtls { amt: 600.0 }, TestTxDtls { amt: 400.0 }],
+                            tx_dtls: vec![
+                                TestTxDtls { amt: 600.0 },
+                                TestTxDtls { amt: 400.0 },
+                            ],
                         },
                     },
                     TestNtry {
@@ -210,6 +214,5 @@ fn test_generate_camt053() {
 
     // Write the generated XML to a file
     let mut file = File::create("result.xml").expect("Unable to create file");
-    file.write_all(xml.as_bytes())
-        .expect("Unable to write data");
+    file.write_all(xml.as_bytes()).expect("Unable to write data");
 }
