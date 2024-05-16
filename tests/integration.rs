@@ -1,336 +1,215 @@
-use camt053::{
-    generate_camt053, Amount, AmountDetails, BankTransactionCode, Creditor, Debtor, Domain,
-    EntryDate, Family, PostalAddress, References, RelatedParties, RemittanceInformation,
-    Transaction, TransactionDetails,
-};
+use camt053::models::*;
+use camt053::serialize::generate_camt053;
+use pretty_assertions::assert_eq;
+use quick_xml::de::from_str;
+use serde::Deserialize;
 use std::fs::File;
-use std::io::BufReader;
-use xml::reader::{EventReader, XmlEvent};
+use std::io::Write;
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestDocument {
+    #[serde(rename = "xmlns", default = "default_xmlns")]
+    pub xmlns: String,
+    #[serde(rename = "BkToCstmrStmt")]
+    bk_to_cstmr_stmt: TestBkToCstmrStmt,
+}
+
+fn default_xmlns() -> String {
+    "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02".to_string()
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestBkToCstmrStmt {
+    #[serde(rename = "GrpHdr")]
+    grp_hdr: TestGrpHdr,
+    #[serde(rename = "Stmt")]
+    stmt: Vec<TestStmt>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestGrpHdr {
+    #[serde(rename = "MsgId")]
+    msg_id: TestMsgId,
+    #[serde(rename = "CreDtTm")]
+    cre_dt_tm: TestCreDtTm,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestMsgId {
+    #[serde(rename = "$value")]
+    value: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestCreDtTm {
+    #[serde(rename = "$value")]
+    value: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestStmt {
+    #[serde(rename = "Id")]
+    id: TestId,
+    #[serde(rename = "ElctrncSeqNb", skip_serializing_if = "Option::is_none")]
+    elctrnc_seq_nb: Option<u32>,
+    #[serde(rename = "LglSeqNb", skip_serializing_if = "Option::is_none")]
+    lgl_seq_nb: Option<u32>,
+    #[serde(rename = "CreDtTm")]
+    cre_dt_tm: TestCreDtTm,
+    #[serde(rename = "Acct")]
+    acct: TestAcct,
+    #[serde(rename = "Ntry", default)]
+    ntry: Vec<TestNtry>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestId {
+    #[serde(rename = "$value")]
+    value: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestAcct {
+    #[serde(rename = "Id")]
+    id: TestAcctId,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestAcctId {
+    #[serde(rename = "IBAN")]
+    iban: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestNtry {
+    #[serde(rename = "Amt")]
+    amt: f64,
+    #[serde(rename = "CdtDbtInd")]
+    cdt_dbt_ind: String,
+    #[serde(rename = "NtryDtls")]
+    ntry_dtls: TestNtryDtls,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestNtryDtls {
+    #[serde(rename = "TxDtls")]
+    tx_dtls: Vec<TestTxDtls>,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+struct TestTxDtls {
+    #[serde(rename = "Amt")]
+    amt: f64,
+}
 
 #[test]
 fn test_generate_camt053() {
-    let file_path = "test_output.xml";
-
-    let transactions = vec![
-        Transaction {
-            amount: Amount {
-                currency: "EUR".to_string(),
-                value: "-100.00".to_string(),
-            },
-            credit_debit_indicator: "DBIT".to_string(),
-            status: "BOOK".to_string(),
-            booking_date: EntryDate {
-                date: "2023-05-14".to_string(),
-            },
-            value_date: EntryDate {
-                date: "2023-05-14".to_string(),
-            },
-            account_servicer_reference: "Ref12345".to_string(),
-            bank_transaction_code: BankTransactionCode {
-                domain: Domain {
-                    code: "PMNT".to_string(),
-                    family: Family {
-                        code: "ICDT".to_string(),
-                        sub_family_code: "DMCT".to_string(),
-                    },
+    let doc = Document {
+        xmlns: "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02".to_string(),
+        bk_to_cstmr_stmt: BkToCstmrStmt {
+            grp_hdr: GrpHdr {
+                msg_id: MsgId {
+                    value: "msg123".to_string(),
+                },
+                cre_dt_tm: CreDtTm {
+                    value: "2024-05-16T16:05:00".to_string(),
                 },
             },
-            entry_details: vec![
-                TransactionDetails {
-                    references: References {
-                        account_servicer_reference: "Ref67890".to_string(),
-                    },
-                    amount_details: AmountDetails {
-                        transaction_amount: Amount {
-                            currency: "EUR".to_string(),
-                            value: "-50.00".to_string(),
-                        },
-                    },
-                    related_parties: RelatedParties {
-                        debtor: Debtor {
-                            name: "John Doe".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "123 Main Street".to_string(),
-                                    "City, Country".to_string(),
-                                ],
-                            },
-                        },
-                        creditor: Creditor {
-                            name: "Jane Smith".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "456 Secondary Street".to_string(),
-                                    "Another City, Country".to_string(),
-                                ],
-                            },
-                        },
-                    },
-                    remittance_information: RemittanceInformation {
-                        unstructured: "Payment for invoice #1234".to_string(),
+            stmt: vec![Stmt {
+                id: Id {
+                    value: "stmt123".to_string(),
+                },
+                elctrnc_seq_nb: None,
+                lgl_seq_nb: None,
+                cre_dt_tm: CreDtTm {
+                    value: "2024-05-16T16:05:00".to_string(),
+                },
+                acct: Acct {
+                    id: AcctId {
+                        iban: "DE89370400440532013000".to_string(),
                     },
                 },
-                TransactionDetails {
-                    references: References {
-                        account_servicer_reference: "Ref67891".to_string(),
-                    },
-                    amount_details: AmountDetails {
-                        transaction_amount: Amount {
-                            currency: "EUR".to_string(),
-                            value: "-50.00".to_string(),
+                ntry: vec![
+                    Ntry {
+                        amt: 1000.0,
+                        cdt_dbt_ind: "CRDT".to_string(),
+                        ntry_dtls: NtryDtls {
+                            tx_dtls: vec![TxDtls { amt: 600.0 }, TxDtls { amt: 400.0 }],
                         },
                     },
-                    related_parties: RelatedParties {
-                        debtor: Debtor {
-                            name: "John Doe".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "123 Main Street".to_string(),
-                                    "City, Country".to_string(),
-                                ],
-                            },
-                        },
-                        creditor: Creditor {
-                            name: "Jane Smith".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "456 Secondary Street".to_string(),
-                                    "Another City, Country".to_string(),
-                                ],
-                            },
+                    Ntry {
+                        amt: 1500.0,
+                        cdt_dbt_ind: "DBIT".to_string(),
+                        ntry_dtls: NtryDtls {
+                            tx_dtls: vec![
+                                TxDtls { amt: 500.0 },
+                                TxDtls { amt: 500.0 },
+                                TxDtls { amt: 500.0 },
+                            ],
                         },
                     },
-                    remittance_information: RemittanceInformation {
-                        unstructured: "Payment for invoice #1235".to_string(),
-                    },
-                },
-            ],
+                ],
+            }],
         },
-        Transaction {
-            amount: Amount {
-                currency: "EUR".to_string(),
-                value: "-150.00".to_string(),
-            },
-            credit_debit_indicator: "DBIT".to_string(),
-            status: "BOOK".to_string(),
-            booking_date: EntryDate {
-                date: "2023-05-15".to_string(),
-            },
-            value_date: EntryDate {
-                date: "2023-05-15".to_string(),
-            },
-            account_servicer_reference: "Ref12346".to_string(),
-            bank_transaction_code: BankTransactionCode {
-                domain: Domain {
-                    code: "PMNT".to_string(),
-                    family: Family {
-                        code: "ICDT".to_string(),
-                        sub_family_code: "DMCT".to_string(),
-                    },
+    };
+
+    let xml = generate_camt053(&doc).unwrap();
+    println!("{}", xml);
+
+    let expected_doc = TestDocument {
+        xmlns: "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02".to_string(),
+        bk_to_cstmr_stmt: TestBkToCstmrStmt {
+            grp_hdr: TestGrpHdr {
+                msg_id: TestMsgId {
+                    value: "msg123".to_string(),
+                },
+                cre_dt_tm: TestCreDtTm {
+                    value: "2024-05-16T16:05:00".to_string(),
                 },
             },
-            entry_details: vec![
-                TransactionDetails {
-                    references: References {
-                        account_servicer_reference: "Ref67892".to_string(),
-                    },
-                    amount_details: AmountDetails {
-                        transaction_amount: Amount {
-                            currency: "EUR".to_string(),
-                            value: "-50.00".to_string(),
-                        },
-                    },
-                    related_parties: RelatedParties {
-                        debtor: Debtor {
-                            name: "John Doe".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "123 Main Street".to_string(),
-                                    "City, Country".to_string(),
-                                ],
-                            },
-                        },
-                        creditor: Creditor {
-                            name: "Jane Smith".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "456 Secondary Street".to_string(),
-                                    "Another City, Country".to_string(),
-                                ],
-                            },
-                        },
-                    },
-                    remittance_information: RemittanceInformation {
-                        unstructured: "Payment for invoice #1236".to_string(),
+            stmt: vec![TestStmt {
+                id: TestId {
+                    value: "stmt123".to_string(),
+                },
+                elctrnc_seq_nb: None,
+                lgl_seq_nb: None,
+                cre_dt_tm: TestCreDtTm {
+                    value: "2024-05-16T16:05:00".to_string(),
+                },
+                acct: TestAcct {
+                    id: TestAcctId {
+                        iban: "DE89370400440532013000".to_string(),
                     },
                 },
-                TransactionDetails {
-                    references: References {
-                        account_servicer_reference: "Ref67893".to_string(),
-                    },
-                    amount_details: AmountDetails {
-                        transaction_amount: Amount {
-                            currency: "EUR".to_string(),
-                            value: "-50.00".to_string(),
+                ntry: vec![
+                    TestNtry {
+                        amt: 1000.0,
+                        cdt_dbt_ind: "CRDT".to_string(),
+                        ntry_dtls: TestNtryDtls {
+                            tx_dtls: vec![TestTxDtls { amt: 600.0 }, TestTxDtls { amt: 400.0 }],
                         },
                     },
-                    related_parties: RelatedParties {
-                        debtor: Debtor {
-                            name: "John Doe".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "123 Main Street".to_string(),
-                                    "City, Country".to_string(),
-                                ],
-                            },
-                        },
-                        creditor: Creditor {
-                            name: "Jane Smith".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "456 Secondary Street".to_string(),
-                                    "Another City, Country".to_string(),
-                                ],
-                            },
+                    TestNtry {
+                        amt: 1500.0,
+                        cdt_dbt_ind: "DBIT".to_string(),
+                        ntry_dtls: TestNtryDtls {
+                            tx_dtls: vec![
+                                TestTxDtls { amt: 500.0 },
+                                TestTxDtls { amt: 500.0 },
+                                TestTxDtls { amt: 500.0 },
+                            ],
                         },
                     },
-                    remittance_information: RemittanceInformation {
-                        unstructured: "Payment for invoice #1237".to_string(),
-                    },
-                },
-                TransactionDetails {
-                    references: References {
-                        account_servicer_reference: "Ref67894".to_string(),
-                    },
-                    amount_details: AmountDetails {
-                        transaction_amount: Amount {
-                            currency: "EUR".to_string(),
-                            value: "-50.00".to_string(),
-                        },
-                    },
-                    related_parties: RelatedParties {
-                        debtor: Debtor {
-                            name: "John Doe".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "123 Main Street".to_string(),
-                                    "City, Country".to_string(),
-                                ],
-                            },
-                        },
-                        creditor: Creditor {
-                            name: "Jane Smith".to_string(),
-                            postal_address: PostalAddress {
-                                address_lines: vec![
-                                    "456 Secondary Street".to_string(),
-                                    "Another City, Country".to_string(),
-                                ],
-                            },
-                        },
-                    },
-                    remittance_information: RemittanceInformation {
-                        unstructured: "Payment for invoice #1238".to_string(),
-                    },
-                },
-            ],
+                ],
+            }],
         },
-    ];
+    };
 
-    generate_camt053(
-        file_path,
-        "Message12345",
-        "2023-05-16 12:30:00",
-        "Statement12345",
-        "2023-05-15 10:00:00",
-        "DE89370400440532013000",
-        "OPBD",
-        "1000.00",
-        "EUR",
-        "CRDT",
-        "2023-05-14",
-        transactions,
-    )
-    .expect("Failed to generate CAMT.053 file");
+    let parsed_doc: TestDocument = from_str(&xml).unwrap();
+    assert_eq!(parsed_doc, expected_doc);
 
-    let file = File::open(file_path).expect("Failed to open generated CAMT.053 file");
-    let file = BufReader::new(file);
-    let parser = EventReader::new(file);
-
-    let mut in_document = false;
-    let mut in_group_header = false;
-    let mut in_statement = false;
-    let mut in_account = false;
-    let mut in_balance = false;
-    let mut in_entry = false;
-
-    for event in parser {
-        match event {
-            Ok(XmlEvent::StartElement { name, .. }) => match name.local_name.as_str() {
-                "Document" => in_document = true,
-                "GrpHdr" => in_group_header = true,
-                "Stmt" => in_statement = true,
-                "Acct" => in_account = true,
-                "Bal" => in_balance = true,
-                "Ntry" => in_entry = true,
-                _ => {}
-            },
-            Ok(XmlEvent::EndElement { name }) => match name.local_name.as_str() {
-                "Document" => in_document = false,
-                "GrpHdr" => in_group_header = false,
-                "Stmt" => in_statement = false,
-                "Acct" => in_account = false,
-                "Bal" => in_balance = false,
-                "Ntry" => in_entry = false,
-                _ => {}
-            },
-            Ok(XmlEvent::Characters(data)) => {
-                if in_group_header {
-                    match data.as_str() {
-                        "Message12345" => assert!(in_group_header),
-                        "2023-05-16 12:30:00" => assert!(in_group_header),
-                        _ => {}
-                    }
-                } else if in_statement {
-                    match data.as_str() {
-                        "Statement12345" => assert!(in_statement),
-                        "2023-05-15 10:00:00" => assert!(in_statement),
-                        _ => {}
-                    }
-                } else if in_account {
-                    match data.as_str() {
-                        "DE89370400440532013000" => assert!(in_account),
-                        _ => {}
-                    }
-                } else if in_balance {
-                    match data.as_str() {
-                        "OPBD" => assert!(in_balance),
-                        "1000.00" => assert!(in_balance),
-                        "CRDT" => assert!(in_balance),
-                        "2023-05-14" => assert!(in_balance),
-                        _ => {}
-                    }
-                } else if in_entry {
-                    match data.as_str() {
-                        "-100.00" => assert!(in_entry),
-                        "DBIT" => assert!(in_entry),
-                        "BOOK" => assert!(in_entry),
-                        "2023-05-14" => assert!(in_entry),
-                        "Ref12345" => assert!(in_entry),
-                        "PMNT" => assert!(in_entry),
-                        "ICDT" => assert!(in_entry),
-                        "DMCT" => assert!(in_entry),
-                        "Ref67890" => assert!(in_entry),
-                        "John Doe" => assert!(in_entry),
-                        "Jane Smith" => assert!(in_entry),
-                        "Payment for invoice #1234" => assert!(in_entry),
-                        _ => {}
-                    }
-                }
-            }
-            Err(e) => panic!("Error: {}", e),
-            _ => {}
-        }
-    }
-
-//    std::fs::remove_file(file_path).expect("Failed to remove test file");
+    // Write the generated XML to a file
+    let mut file = File::create("result.xml").expect("Unable to create file");
+    file.write_all(xml.as_bytes())
+        .expect("Unable to write data");
 }
